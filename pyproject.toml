@@ -1,0 +1,25 @@
+[project]
+name = "bosch-vta-agent"
+version = "1.0.0"
+description = "An advanced automotive technical assistant API with RAG capabilities"
+authors = [
+    {name = "Vyoman Jain", email = "vyomanjain@gmail.com"},
+    {name = "Samarth P", email = "samarthprakash8@gmail.com"},
+]
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "duckduckgo-search>=8.0.0",
+    "fastapi[standard]>=0.115.12",
+    "llama-index>=0.12.30",
+    "llama-index-embeddings-jinaai>=0.4.0",
+    "llama-index-llms-groq>=0.3.1",
+    "llama-index-vector-stores-qdrant>=0.6.0",
+    "llama-parse>=0.6.12",
+    "python-dotenv>=1.1.0",
+    "python-multipart>=0.0.20",
+    "soundfile>=0.13.1",
+    "passlib>=1.7.4",
+    "python-jose[cryptography]>=3.4.0",
+    "groq>=0.22.0",
+]
