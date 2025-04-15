@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, Request
 from typing import Optional
 from app.utils.schema import (
     QueryRequest,
@@ -21,17 +21,17 @@ router = APIRouter(
 
 
 # Dependency to get the RAG pipeline from the app state
-async def get_rag_pipeline(app_state=Depends(lambda: router.app.state)):
-    if not hasattr(app_state, "rag_pipeline"):
+async def get_rag_pipeline(request: Request):
+    if not hasattr(request.app.state, "rag_pipeline"):
         raise HTTPException(status_code=500, detail="RAG pipeline not initialized")
-    return app_state.rag_pipeline
+    return request.app.state.rag_pipeline
 
 
 # Dependency to get the Groq client from the app state
-async def get_groq_client(app_state=Depends(lambda: router.app.state)):
-    if not hasattr(app_state, "groq_client"):
+async def get_groq_client(request: Request):
+    if not hasattr(request.app.state, "groq_client"):
         raise HTTPException(status_code=500, detail="Groq client not initialized")
-    return app_state.groq_client
+    return request.app.state.groq_client
 
 
 @router.post("/query", response_model=ChatResponse)
