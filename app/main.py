@@ -100,11 +100,14 @@ async def health_check():
 
     return {"status": "healthy", "details": health_status}
 
-
-if __name__ == "__main__":
+def run_server():
+    """Entry point for running the server with uv"""
     import uvicorn
 
-    # Development server settings
     uvicorn.run(
         "app.main:app", host="0.0.0.0", port=8000, reload=True, log_level="info"
     )
+
+
+if __name__ == "__main__":
+    run_server()

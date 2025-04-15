@@ -1,5 +1,5 @@
 [project]
-name = "bosch-vta-agent"
+name = "bosch_vta_agent"
 version = "1.0.0"
 description = "An advanced automotive technical assistant API with RAG capabilities"
 authors = [
@@ -23,3 +23,6 @@ dependencies = [
     "python-jose[cryptography]>=3.4.0",
     "groq>=0.22.0",
 ]
+
+[project.scripts]
+run-server = "app.main:run_server"
