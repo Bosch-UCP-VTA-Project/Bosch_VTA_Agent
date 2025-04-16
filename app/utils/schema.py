@@ -1,4 +1,4 @@
-from typing import List, Dict, Optional, Any
+from typing import List, Dict, Optional, Any, Union
 from pydantic import BaseModel, Field
 from datetime import datetime
 from enum import Enum
@@ -63,7 +63,7 @@ class ChatMessage(BaseModel):
 
 
 class ChatHistory(BaseModel):
-    history: List[ChatMessage]
+    history: List[Dict[str, Any]]  # Change to Any to allow nested structures
 
 
 class Source(BaseModel):
@@ -78,20 +78,20 @@ class HistoryRequest(BaseModel):
 
 class QueryRequest(BaseModel):
     query: str
-    session_id: str
+    session_id: Optional[str] = None  # Make session_id optional
 
 
 class ChatResponse(BaseModel):
     answer: str
     session_id: str
-    history: List[Dict[str, str]]
+    history: List[Dict[str, Any]]  # Change to Any to allow nested structures
     source_nodes: List[Dict[str, str]]
 
 
 class AudioResponse(BaseModel):
     answer: str
     transcribed: str
-    history: List[Dict[str, Any]]
+    history: List[Dict[str, Any]]  # Change to Any
     source_nodes: Optional[List] = None
     session_id: str
 

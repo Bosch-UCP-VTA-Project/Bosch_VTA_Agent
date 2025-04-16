@@ -75,7 +75,7 @@ async def query(
         result = rag_pipeline.query(request.query, session_id)
 
         # Store assistant response in MongoDB
-        # Check if source_nodes are dict objects or objects with to_dict method
+        # Ensure source_nodes are consistently formatted as dictionaries
         source_nodes_data = []
         if result.source_nodes:
             for node in result.source_nodes:
@@ -85,6 +85,8 @@ async def query(
                     source_nodes_data.append(node.to_dict())
                 else:
                     print(f"Warning: Unexpected node type: {type(node)}")
+                    # Convert to a reasonable default format if needed
+                    source_nodes_data.append({"text": str(node), "score": "0.0"})
 
         await mongodb.add_chat_message(
             {
@@ -108,6 +110,7 @@ async def query(
                 "timestamp": msg["timestamp"],
             }
             if msg["role"] == "assistant" and "source_nodes" in msg:
+                # Just directly add the source_nodes, schema now accepts Any type
                 entry["source_nodes"] = msg["source_nodes"]
             formatted_history.append(entry)
 
@@ -146,6 +149,7 @@ async def history(
                 "timestamp": msg["timestamp"],
             }
             if msg["role"] == "assistant" and "source_nodes" in msg:
+                # Direct assignment now works with updated schema
                 entry["source_nodes"] = msg["source_nodes"]
             formatted_history.append(entry)
 
@@ -275,6 +279,7 @@ async def audio_query(
                 "timestamp": msg["timestamp"],
             }
             if msg["role"] == "assistant" and "source_nodes" in msg:
+                # Just directly add the source_nodes array
                 entry["source_nodes"] = msg["source_nodes"]
             formatted_history.append(entry)
 

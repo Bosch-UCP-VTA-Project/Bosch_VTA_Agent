@@ -97,7 +97,7 @@ class AutoTechnicianRAG:
         self.system_prompt = SYSTEM_PROMPT
 
         # Configure global settings
-        llm = Groq(model="llama-3.1-8b-instant", api_key=os.getenv("GROQ_API_KEY"))
+        llm = Groq(model="llama-3.3-70b-versatile", api_key=os.getenv("GROQ_API_KEY"))
         embed_model = JinaEmbedding(
             api_key=os.getenv("JINA_API_KEY"),
             model="jina-embeddings-v3",
