@@ -33,3 +33,34 @@ packages = ["app"]
 
 [project.scripts]
 run-server = "app.main:run_server"
+
+[tool.poetry]
+name = "bosch_vta_agent"
+version = "1.0.0"
+description = "An advanced automotive technical assistant API with RAG capabilities"
+authors = ["Vyoman Jain <vyomanjain@gmail.com>", "Samarth P <samarthprakash8@gmail.com>"]
+readme = "README.md"
+packages = [{include = "app"}]
+
+[tool.poetry.dependencies]
+python = ">=3.11,<3.12"
+duckduckgo-search = "^8.0.0"
+fastapi = {extras = ["standard"], version = "^0.115.12"}
+llama-index = "^0.12.30"
+llama-index-embeddings-jinaai = "^0.4.0"
+llama-index-llms-groq = "^0.3.1"
+llama-index-vector-stores-qdrant = "^0.6.0"
+llama-parse = "^0.6.12"
+python-dotenv = "^1.1.0"
+python-multipart = "^0.0.20"
+soundfile = "^0.13.1"
+passlib = "^1.7.4"
+python-jose = {extras = ["cryptography"], version = "^3.4.0"}
+groq = "^0.22.0"
+bcrypt = "<4.0.0"
+pymongo = "^4.12.0"
+motor = "^3.7.0"
+dnspython = "^2.7.0"
+
+[tool.poetry.scripts]
+run-server = "app.main:run_server"
