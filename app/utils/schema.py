@@ -91,8 +91,9 @@ class ChatResponse(BaseModel):
 class AudioResponse(BaseModel):
     answer: str
     transcribed: str
-    history: List[Dict[str, str]]
-    source_nodes: List[Dict[str, str]]
+    history: List[Dict[str, Any]]
+    source_nodes: Optional[List] = None
+    session_id: str
 
 
 class ManualsResponse(BaseModel):

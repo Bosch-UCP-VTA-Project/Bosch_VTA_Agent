@@ -1,38 +1,30 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 import os
+import traceback
 from groq import Groq
 from llama_parse import LlamaParse
 from dotenv import load_dotenv
 from app.utils.rag import AutoTechnicianRAG
 from app.routers import auth, chat, documents
+from app.utils.mongodb import MongoDB
+from contextlib import asynccontextmanager
 
 load_dotenv()
 
-app = FastAPI(
-    title="Bosch VTA Agent",
-    description="An advanced automotive technical assistant API with RAG capabilities",
-    version="1.0.0",
-)
 
-# Add CORS middleware
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Initialize services on startup
+    # Initialize MongoDB
+    try:
+        app.state.mongodb = MongoDB()
+        print("MongoDB connection initialized successfully.")
+    except Exception as e:
+        print(f"Error initializing MongoDB: {str(e)}")
+        raise
 
-# Include routers
-app.include_router(auth.router)
-app.include_router(chat.router)
-app.include_router(documents.router)
-
-
-# Initialize services on startup
-@app.on_event("startup")
-async def startup_event():
     # Initialize document parser
     app.state.parser = LlamaParse(
         api_key=os.getenv("LLAMA_CLOUD_API_KEY"),
@@ -76,6 +68,35 @@ async def startup_event():
         print(f"Error initializing RAG pipeline: {str(e)}")
         raise
 
+    yield  # This is where the FastAPI application runs
+
+    # Cleanup on shutdown
+    if hasattr(app.state, "mongodb"):
+        app.state.mongodb.close()
+        print("MongoDB connection closed.")
+
+
+app = FastAPI(
+    title="Bosch VTA Agent",
+    description="An advanced automotive technical assistant API with RAG capabilities",
+    version="1.0.0",
+    lifespan=lifespan,
+)
+
+# Add CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Include routers
+app.include_router(auth.router)
+app.include_router(chat.router)
+app.include_router(documents.router)
+
 
 @app.get("/", tags=["health"])
 async def root():
@@ -92,6 +113,7 @@ async def health_check():
             "rag_pipeline": hasattr(app.state, "rag_pipeline"),
             "groq_client": hasattr(app.state, "groq_client"),
             "parser": hasattr(app.state, "parser"),
+            "mongodb": hasattr(app.state, "mongodb"),
         },
     }
 
@@ -99,6 +121,20 @@ async def health_check():
         return {"status": "degraded", "details": health_status}
 
     return {"status": "healthy", "details": health_status}
+
+
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    """Global exception handler with detailed error logging"""
+    error_trace = traceback.format_exc()
+    error_message = f"Unhandled exception: {str(exc)}\n{error_trace}"
+    print(error_message)
+
+    return JSONResponse(
+        status_code=500,
+        content={"detail": str(exc), "path": request.url.path},
+    )
+
 
 def run_server():
     """Entry point for running the server with uv"""

@@ -1,9 +1,10 @@
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Request
 from typing import Dict
 from app.utils.schema import ManualsResponse, User
 from app.utils.helpers import get_current_user
 from app.utils.rag import AutoTechnicianRAG
 from llama_parse import LlamaParse
+from datetime import datetime
 import os
 
 router = APIRouter(
@@ -30,6 +31,7 @@ async def get_parser(app_state=Depends(lambda: router.app.state)):
 @router.post("/upload", response_model=Dict[str, str])
 async def upload_document(
     file: UploadFile = File(...),
+    request: Request = None,
     current_user: User = Depends(get_current_user),
     rag_pipeline: AutoTechnicianRAG = Depends(get_rag_pipeline),
     parser: LlamaParse = Depends(get_parser),
@@ -43,18 +45,18 @@ async def upload_document(
         )
 
     try:
+        mongodb = request.app.state.mongodb
+
         # Read file content
         file_content = await file.read()
+
+        upload_time = datetime.utcnow().isoformat()
 
         # Add metadata about who uploaded the file
         extra_info = {
             "file_name": file.filename,
             "uploaded_by": current_user.username,
-            "upload_date": str(
-                os.path.getmtime(file.filename)
-                if os.path.exists(file.filename)
-                else None
-            ),
+            "upload_date": upload_time,
         }
 
         # Parse the PDF into markdown
@@ -69,6 +71,17 @@ async def upload_document(
                 detail="Failed to add document to the knowledge base",
             )
 
+        # Store document metadata in MongoDB
+        await mongodb.add_document(
+            {
+                "file_name": file.filename,
+                "uploaded_by": current_user.username,
+                "user_id": current_user.id,
+                "upload_date": upload_time,
+                "status": "processed",
+            }
+        )
+
         return {"file_name": file.filename, "status": "processed"}
 
     except Exception as e:
@@ -79,12 +92,21 @@ async def upload_document(
 
 @router.get("/list", response_model=ManualsResponse)
 async def list_documents(
+    request: Request = None,
     current_user: User = Depends(get_current_user),
     rag_pipeline: AutoTechnicianRAG = Depends(get_rag_pipeline),
 ):
     """List all available technical manuals/documents"""
     try:
+        mongodb = request.app.state.mongodb
+
+        # Get documents from MongoDB instead of RAG system if you want to show upload metadata
+        documents = await mongodb.list_documents()
+
+        # You can still use the RAG pipeline's list_manuals if it provides specific information
         manuals = rag_pipeline.list_manuals()
+
+        # Combine data as needed
         return ManualsResponse(manuals=manuals)
     except Exception as e:
         raise HTTPException(

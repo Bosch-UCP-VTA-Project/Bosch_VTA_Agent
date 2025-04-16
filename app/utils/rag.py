@@ -144,6 +144,31 @@ class AutoTechnicianRAG:
         )
 
     def create_index(self, collection_name: str):
+        # Create collection with optimized settings first
+        vector_size = 1024  # Jina embedding size
+
+        # Create the collection with optimized settings
+        self.qdrant_client.create_collection(
+            collection_name=collection_name,
+            vectors_config={
+                "size": vector_size,
+                "distance": "Cosine",
+            },
+            quantization_config={
+                "scalar": {
+                    "type": "int8",
+                    "always_ram": True,  # Keep quantized vectors in RAM
+                }
+            },
+            hnsw_config={
+                "m": 16,  # Lower value for faster indexing
+                "ef_construct": 100,  # Lower value for faster indexing
+            },
+            optimizers_config={
+                "default_segment_number": 2,  # Use fewer segments for better throughput
+            },
+        )
+
         # Initialize vector store
         vector_store = QdrantVectorStore(
             client=self.qdrant_client, collection_name=collection_name
@@ -165,35 +190,42 @@ class AutoTechnicianRAG:
                 f"No documents loaded for {collection_name}. Check the path."
             )
 
+        # Add file metadata consistently
+        for doc in documents:
+            if not doc.metadata:
+                doc.metadata = {}
+            doc.metadata["file_path"] = doc.metadata.get("file_path", "")
+            doc.metadata["file_name"] = doc.metadata.get(
+                "file_name", ""
+            ) or os.path.basename(doc.metadata.get("file_path", ""))
+
         # Create index
         self.indexes[collection_name] = VectorStoreIndex.from_documents(
             documents,
             storage_context=storage_context,
-            llm=Settings.llm,
-            embed_model=Settings.embed_model,
         )
 
     def add_documents(self, markdown_documents):
         try:
-            metadata = {
-                "file_name": markdown_documents[0].metadata.get("file_name", ""),
-            }
-            content = ""
+            processed_docs = []
             for doc in markdown_documents:
-                content += doc.text_resource.text + "\n"
-            documents = Document(
-                text=content,
-                metadata=metadata,
-            )
-            nodes = run_transformations(
-                [documents],  # type: ignore
-                transformations=Settings.transformations,
-                llm=Settings.llm,
-                embed_model=Settings.embed_model,
-            )
-            self.indexes["manuals"].vector_store.add(
-                nodes, llm=Settings.llm, embed_model=Settings.embed_model
-            )
+                if not doc.metadata:
+                    doc.metadata = {}
+                # Ensure consistent metadata
+                file_path = doc.metadata.get("file_path", "")
+                doc.metadata["file_path"] = file_path
+                doc.metadata["file_name"] = doc.metadata.get(
+                    "file_name", ""
+                ) or os.path.basename(file_path)
+                processed_docs.append(doc)
+
+            # Get the existing index
+            index = self.indexes["manuals"]
+
+            # Insert the documents using consistent method
+            for doc in processed_docs:
+                index.insert(doc)
+
             print("Documents added to the 'manuals' vector index.")
             return True
         except Exception as e:

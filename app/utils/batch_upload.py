@@ -26,7 +26,7 @@ def count_tokens(text: str) -> int:
 
 
 def process_folder(
-    folder_path: str, max_tokens_per_batch: int = 500_000
+    folder_path: str, max_tokens_per_batch: int = 600_000
 ) -> List[List[str]]:
     """
     Process a folder and create batches of files not exceeding max_tokens_per_batch
@@ -39,7 +39,7 @@ def process_folder(
         for file in files:
             if file.endswith((".txt", ".md", ".html", ".pdf", ".docx")):
                 all_files.append(os.path.join(root, file))
-    
+
     # Create batches
     batches = []
     current_batch = []
@@ -128,9 +128,10 @@ def upload_batch_to_qdrant(
     Settings.embed_model = embed_model
     Settings.llm = llm
 
-    # Initialize vector store
+    # Initialize vector store with optimized settings
     vector_store = QdrantVectorStore(
-        client=qdrant_client_instance, collection_name=collection_name
+        client=qdrant_client_instance,
+        collection_name=collection_name,
     )
 
     storage_context = StorageContext.from_defaults(vector_store=vector_store)
@@ -167,7 +168,42 @@ def upload_batch_to_qdrant(
             col.name == collection_name for col in collections.collections
         )
 
-        if collection_exists:
+        if not collection_exists:
+            # Create collection with optimized configuration
+            print(f"Creating new collection: {collection_name}")
+
+            # Get vector size from embedding model
+            vector_size = 1024
+
+            # Create the collection with optimized settings
+            qdrant_client_instance.create_collection(
+                collection_name=collection_name,
+                vectors_config={
+                    "size": vector_size,
+                    "distance": "Cosine",
+                },
+                quantization_config={
+                    "scalar": {
+                        "type": "int8",
+                        "always_ram": True,  # Keep quantized vectors in RAM
+                    }
+                },
+                hnsw_config={
+                    "m": 16,  # Lower value for faster indexing
+                    "ef_construct": 100,  # Lower value for faster indexing
+                },
+                optimizers_config={
+                    "default_segment_number": 2,  # Use fewer segments for better throughput
+                },
+            )
+
+            # Create index with the documents
+            VectorStoreIndex.from_documents(
+                all_documents,
+                storage_context=storage_context,
+            )
+
+        else:
             print(f"Updating existing collection: {collection_name}")
             # Get the existing index
             index = VectorStoreIndex.from_vector_store(
@@ -177,12 +213,6 @@ def upload_batch_to_qdrant(
             # Insert the documents
             for doc in all_documents:
                 index.insert(doc)
-        else:
-            print(f"Creating new collection: {collection_name}")
-            VectorStoreIndex.from_documents(
-                all_documents,
-                storage_context=storage_context,
-            )
 
         print("Successfully uploaded batch to Qdrant")
         return True
@@ -203,7 +233,7 @@ def main():
     parser.add_argument(
         "--batch-size",
         type=int,
-        default=500000,
+        default=600000,
         help="Maximum number of tokens per batch",
     )
     parser.add_argument(

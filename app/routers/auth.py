@@ -1,7 +1,6 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Request
 from fastapi.security import OAuth2PasswordRequestForm
 from datetime import datetime, timedelta
-from typing import List, Dict
 from uuid import uuid4
 from app.utils.schema import UserCreate, User, Token, UserInDB
 from app.utils.helpers import (
@@ -9,8 +8,8 @@ from app.utils.helpers import (
     authenticate_user,
     create_access_token,
     get_current_user,
-    fake_users_db,
     ACCESS_TOKEN_EXPIRE_MINUTES,
+    get_mongodb,
 )
 
 router = APIRouter(
@@ -21,9 +20,12 @@ router = APIRouter(
 
 
 @router.post("/register", response_model=User)
-async def register_user(user_data: UserCreate):
+async def register_user(user_data: UserCreate, request: Request):
     """Register a new user and return user information"""
-    if user_data.username in fake_users_db:
+    mongodb = request.app.state.mongodb
+
+    existing_user = await mongodb.get_user_by_username(user_data.username)
+    if existing_user:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Username already registered",
@@ -41,7 +43,7 @@ async def register_user(user_data: UserCreate):
         created_at=datetime.utcnow(),
     )
 
-    fake_users_db[user_data.username] = db_user.dict()
+    await mongodb.create_user(db_user.dict())
 
     return User(
         id=user_id,
@@ -53,9 +55,13 @@ async def register_user(user_data: UserCreate):
 
 
 @router.post("/token", response_model=Token)
-async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends()):
+async def login_for_access_token(
+    form_data: OAuth2PasswordRequestForm = Depends(), request: Request = None
+):
     """Get access token for logged in user"""
-    user = authenticate_user(fake_users_db, form_data.username, form_data.password)
+    mongodb = request.app.state.mongodb
+    user = await authenticate_user(mongodb, form_data.username, form_data.password)
+
     if not user:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
